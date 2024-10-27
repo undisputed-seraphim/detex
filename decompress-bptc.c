@@ -139,16 +139,21 @@ static void FullyDecodeEndpoints(uint8_t * DETEX_RESTRICT endpoint_array, int nu
 int mode, detexBlock128 * DETEX_RESTRICT block) {
 	if (mode_has_p_bits[mode]) {
 		// Mode 1 (shared P-bits) handled elsewhere.
-		// Extract end-point P-bits. Take advantage of the fact that they don't cross the
-		// 64-bit word boundary in any mode.
+		// Extract end-point P-bits.
 		uint32_t bits;
 		if (block->index < 64)
-			bits = block->data0 >> block->index;
+		{
+			bits = (uint32_t)(block->data0 >> block->index);
+			if ((block->index + nu_subsets * 2) > 64)
+			{
+				bits |= (block->data1 << (64 - block->index));
+			}
+		}
 		else
-			bits = block->data1 >> (block->index - 64);
+			bits = (uint32_t)(block->data1 >> (block->index - 64));
 		for (int i = 0; i < nu_subsets * 2; i++) {
 			endpoint_array[i * 4 + 0] <<= 1;
- 			endpoint_array[i * 4 + 1] <<= 1;
+			endpoint_array[i * 4 + 1] <<= 1;
 			endpoint_array[i * 4 + 2] <<= 1;
 			endpoint_array[i * 4 + 3] <<= 1;
 			endpoint_array[i * 4 + 0] |= (bits & 1);
@@ -169,7 +174,7 @@ int mode, detexBlock128 * DETEX_RESTRICT block) {
 		endpoint_array[i * 4 + 2] <<= (8 - color_prec);
 		endpoint_array[i * 4 + 3] <<= (8 - alpha_prec);
 
-	        // Replicate each component's MSB into the LSBs revealed by the left-shift operation above.
+		// Replicate each component's MSB into the LSBs revealed by the left-shift operation above.
 		endpoint_array[i * 4 + 0] |= (endpoint_array[i * 4 + 0] >> color_prec);
 		endpoint_array[i * 4 + 1] |= (endpoint_array[i * 4 + 1] >> color_prec);
 		endpoint_array[i * 4 + 2] |= (endpoint_array[i * 4 + 2] >> color_prec);
@@ -178,15 +183,14 @@ int mode, detexBlock128 * DETEX_RESTRICT block) {
 	if (mode <= 3) {
 		for (int i = 0; i < nu_subsets * 2; i++)
 			endpoint_array[i * 4 + 3] = 0xFF;
- 	}
+	}
 }
 
 static uint8_t Interpolate(uint8_t e0, uint8_t e1, uint8_t index, uint8_t indexprecision) {
 	if (indexprecision == 2)
 		return (uint8_t) (((64 - detex_bptc_table_aWeight2[index]) * (uint16_t)e0
 			+ detex_bptc_table_aWeight2[index] * (uint16_t)e1 + 32) >> 6);
-	else
-	if (indexprecision == 3)
+	else if (indexprecision == 3)
 		return (uint8_t) (((64 - detex_bptc_table_aWeight3[index]) * (uint16_t)e0
 			+ detex_bptc_table_aWeight3[index] * (uint16_t)e1 + 32) >> 6);
 	else // indexprecision == 4
@@ -201,7 +205,7 @@ static DETEX_INLINE_ONLY int GetColorIndexBitcount(int mode, int index_selection
 	return bptc_color_index_bitcount[mode] + index_selection_bit;
 }
 
-static uint8_t bptc_alpha_index_bitcount[8] = { 3, 3, 2, 2, 3, 2, 4, 2};
+static uint8_t bptc_alpha_index_bitcount[8] = { 3, 3, 2, 2, 3, 2, 4, 2 };
 
 static DETEX_INLINE_ONLY int GetAlphaIndexBitcount(int mode, int index_selection_bit) {
 	// If the index selection bit is set for mode 4, return 2, otherwise 3.
@@ -235,7 +239,7 @@ static int ExtractMode(detexBlock128 *block) {
 			return i;
 		}
 	// Illegal.
-	return - 1;
+	return -1;
 }
 
 static DETEX_INLINE_ONLY int ExtractPartitionSetID(detexBlock128 *block, int mode) {
@@ -295,11 +299,11 @@ uint8_t * DETEX_RESTRICT pixel_buffer) {
 		endpoint[i * 3 + 0] <<= 2;
 		endpoint[i * 3 + 1] <<= 2;
 		endpoint[i * 3 + 2] <<= 2;
-       	}
+	}
 	// P-bit is shared.
 	uint8_t pbit_zero = detexGetBits64(data1, 16, 16) << 1;
 	uint8_t pbit_one = detexGetBits64(data1, 17, 17) << 1;
-        // RGB only pbits for mode 1, one for each subset.
+	// RGB only pbits for mode 1, one for each subset.
 	for (int j = 0; j < 3; j++) {
 		endpoint[0 * 3 + j] |= pbit_zero;
 		endpoint[1 * 3 + j] |= pbit_zero;
@@ -307,12 +311,12 @@ uint8_t * DETEX_RESTRICT pixel_buffer) {
 		endpoint[3 * 3 + j] |= pbit_one;
 	}
 	for (int i = 0; i < 2 * 2; i++) {
-	        // Replicate each component's MSB into the LSB.
+		// Replicate each component's MSB into the LSB.
 		endpoint[i * 3 + 0] |= endpoint[i * 3 + 0] >> 7;
 		endpoint[i * 3 + 1] |= endpoint[i * 3 + 1] >> 7;
 		endpoint[i * 3 + 2] |= endpoint[i * 3 + 2] >> 7;
 	}
- 
+
 	uint8_t subset_index[16];
 	for (int i = 0; i < 16; i++)
 		// subset_index[i] is a number from 0 to 1.
@@ -333,22 +337,22 @@ uint8_t * DETEX_RESTRICT pixel_buffer) {
 			color_index[i] = data1 & 7;	// Get three bits.
 			data1 >>= 3;
 		}
-	uint32_t *pixel32_buffer = (uint32_t *)pixel_buffer;
-	for (int i = 0; i < 16; i++) {
-		uint8_t endpoint_start[3];
-		uint8_t endpoint_end[3];
-		for (int j = 0; j < 3; j++) {
-			 endpoint_start[j] = endpoint[2 * subset_index[i] * 3 + j];
-			 endpoint_end[j] = endpoint[(2 * subset_index[i] + 1) * 3 + j];
+		uint32_t *pixel32_buffer = (uint32_t *)pixel_buffer;
+		for (int i = 0; i < 16; i++) {
+			uint8_t endpoint_start[3];
+			uint8_t endpoint_end[3];
+			for (int j = 0; j < 3; j++) {
+				endpoint_start[j] = endpoint[2 * subset_index[i] * 3 + j];
+				endpoint_end[j] = endpoint[(2 * subset_index[i] + 1) * 3 + j];
+			}
+			uint32_t output;
+			output = detexPack32R8(Interpolate(endpoint_start[0], endpoint_end[0], color_index[i], 3));
+			output |= detexPack32G8(Interpolate(endpoint_start[1], endpoint_end[1], color_index[i], 3));
+			output |= detexPack32B8(Interpolate(endpoint_start[2], endpoint_end[2], color_index[i], 3));
+			output |= detexPack32A8(0xFF);
+			pixel32_buffer[i] = output;
 		}
-		uint32_t output;
-		output = detexPack32R8(Interpolate(endpoint_start[0], endpoint_end[0], color_index[i], 3));
-		output |= detexPack32G8(Interpolate(endpoint_start[1], endpoint_end[1], color_index[i], 3));
-		output |= detexPack32B8(Interpolate(endpoint_start[2], endpoint_end[2], color_index[i], 3));
-		output |= detexPack32A8(0xFF);
-		pixel32_buffer[i] = output;
-	}
-	return true;
+		return true;
 }
 
 /* Decompress a 128-bit 4x4 pixel texture block compressed using the BPTC */
@@ -360,7 +364,7 @@ uint32_t flags, uint8_t * DETEX_RESTRICT pixel_buffer) {
 	block.data1 = *(uint64_t *)&bitstring[8];
 	block.index = 0;
 	int mode = ExtractMode(&block);
-	if (mode == - 1)
+	if (mode == -1)
 		return 0;
 	// Allow compression tied to specific modes (according to mode_mask).
 	if (!(mode_mask & ((int)1 << mode)))
@@ -394,11 +398,13 @@ uint32_t flags, uint8_t * DETEX_RESTRICT pixel_buffer) {
 	for (int i = 0; i < 16; i++)
 		// subset_index[i] is a number from 0 to 2, or 0 to 1, or 0 depending on the number of subsets.
 		subset_index[i] = GetPartitionIndex(nu_subsets, partition_set_id, i);
-	uint8_t anchor_index[4];	// Only need max. 3 elements.
+	uint8_t anchor_index[4] = { 0, 0, 0, 0 };	// Only need max. 3 elements.
 	for (int i = 0; i < nu_subsets; i++)
 		anchor_index[i] = GetAnchorIndex(partition_set_id, i, nu_subsets);
 	uint8_t color_index[16];
 	uint8_t alpha_index[16];
+	memset(color_index, 0, sizeof(color_index));
+	memset(alpha_index, 0, sizeof(alpha_index));
 	// Extract primary index bits.
 	uint64_t data1;
 	if (block.index >= 64) {
@@ -422,11 +428,11 @@ uint32_t flags, uint8_t * DETEX_RESTRICT pixel_buffer) {
 			}
 	}
 	else {	// Implies mode 4.
-		// Because the bits cross the 64-bit word boundary, we have to be careful.
-		// Block index is 50 at this point.
+			// Because the bits cross the 64-bit word boundary, we have to be careful.
+			// Block index is 50 at this point.
 		uint64_t data = block.data0 >> 50;
 		data |= block.data1 << 14;
-		for (int i = 0; i < 16; i++)
+		for (int i = 0; i < 16; i++) {
 			if (i == anchor_index[subset_index[i]]) {
 				// Highest bit is zero.
 				if (index_selection_bit) {	// Implies mode == 4.
@@ -448,6 +454,7 @@ uint32_t flags, uint8_t * DETEX_RESTRICT pixel_buffer) {
 					data >>= 2;
 				}
 			}
+		}
 		// Block index is 81 at this point.
 		data1 = block.data1 >> (81 - 64);
 	}
@@ -463,7 +470,7 @@ uint32_t flags, uint8_t * DETEX_RESTRICT pixel_buffer) {
 					data1 >>= 2;
 				}
 				else {
-//					alpha_index[i] = block_extract_bits(&block, IB2[mode] - 1);
+					//					alpha_index[i] = block_extract_bits(&block, IB2[mode] - 1);
 					alpha_index[i] = data1 & mask2;
 					data1 >>= IB2[mode] - 1;
 				}
@@ -474,7 +481,6 @@ uint32_t flags, uint8_t * DETEX_RESTRICT pixel_buffer) {
 					data1 >>= 3;
 				}
 				else {
-//					alpha_index[i] = block_extract_bits(&block, IB2[mode]);
 					alpha_index[i] = data1 & mask1;
 					data1 >>= IB2[mode];
 				}
@@ -486,8 +492,8 @@ uint32_t flags, uint8_t * DETEX_RESTRICT pixel_buffer) {
 		uint8_t endpoint_start[4];
 		uint8_t endpoint_end[4];
 		for (int j = 0; j < 4; j++) {
-			 endpoint_start[j] = endpoint_array[2 * subset_index[i] * 4 + j];
-			 endpoint_end[j] = endpoint_array[(2 * subset_index[i] + 1) * 4 + j];
+			endpoint_start[j] = endpoint_array[2 * subset_index[i] * 4 + j];
+			endpoint_end[j] = endpoint_array[(2 * subset_index[i] + 1) * 4 + j];
 		}
 
 		uint32_t output = 0;
@@ -495,13 +501,12 @@ uint32_t flags, uint8_t * DETEX_RESTRICT pixel_buffer) {
 		output |= detexPack32G8(Interpolate(endpoint_start[1], endpoint_end[1], color_index[i], color_index_bitcount));
 		output |= detexPack32B8(Interpolate(endpoint_start[2], endpoint_end[2], color_index[i], color_index_bitcount));
 		output |= detexPack32A8(Interpolate(endpoint_start[3], endpoint_end[3], alpha_index[i], alpha_index_bitcount));
-   
+
 		if (rotation > 0) {
 			if (rotation == 1)
 				output = detexPack32RGBA8(detexPixel32GetA8(output), detexPixel32GetG8(output),
 					detexPixel32GetB8(output), detexPixel32GetR8(output));
-			else
-			if (rotation == 2)
+			else if (rotation == 2)
 				output = detexPack32RGBA8(detexPixel32GetR8(output), detexPixel32GetA8(output),
 					detexPixel32GetB8(output), detexPixel32GetG8(output));
 			else // rotation == 3
