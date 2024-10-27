@@ -20,7 +20,6 @@ OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #include <math.h>
 #include <float.h>
 #include <fenv.h>
-#include <pthread.h>
 
 #include "detex.h"
 #include "half-float.h"
@@ -279,13 +278,13 @@ static void detexCalculateHalfFloatTable() {
 	free(hf_buffer);
 }
 
-static pthread_mutex_t mutex_half_float_table = PTHREAD_MUTEX_INITIALIZER;
+//static pthread_mutex_t mutex_half_float_table = PTHREAD_MUTEX_INITIALIZER;
 
 void detexValidateHalfFloatTable() {
-	pthread_mutex_lock(&mutex_half_float_table);
+	//pthread_mutex_lock(&mutex_half_float_table);
 	if (detex_half_float_table == NULL)
 		detexCalculateHalfFloatTable();
-	pthread_mutex_unlock(&mutex_half_float_table);
+	//pthread_mutex_unlock(&mutex_half_float_table);
 }
 
 // Conversion functions.

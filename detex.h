@@ -72,7 +72,12 @@ __BEGIN_DECLS
 #include <stdint.h>
 #include <stdbool.h>
 
+#ifdef _MSC_VER
+#define DETEX_INLINE_ONLY __forceinline
+#define __thread __declspec(thread)
+#else
 #define DETEX_INLINE_ONLY __attribute__((always_inline)) inline
+#endif
 #define DETEX_RESTRICT __restrict
 
 /* Maximum uncompressed block size in bytes. */

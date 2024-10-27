@@ -751,8 +751,8 @@ uint8_t * DETEX_RESTRICT target_pixel_buffer) {
 }
 
 
-typedef void (*detexConversionFunc)(uint8_t *source_pixel_buffer, int nu_pixels,
-	uint8_t *target_pixel_buffer);
+typedef void (*detexConversionFunc)(uint8_t * DETEX_RESTRICT source_pixel_buffer, int nu_pixels,
+	uint8_t * DETEX_RESTRICT target_pixel_buffer);
 
 typedef struct {
 	uint32_t source_format;

@@ -16,6 +16,8 @@ OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 */
 
+#include <string.h>
+
 #include "detex.h"
 #include "bits.h"
 #include "bptc-tables.h"
